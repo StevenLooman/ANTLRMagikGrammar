@@ -1,4 +1,4 @@
-grammar Magik2;
+grammar Magik;
 
 options {
 	output = AST;
