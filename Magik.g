@@ -27,7 +27,7 @@ pragma
 	;
 
 pragma_param
-	:	IDENTIFIER '='^ pragma_value
+	:	IDENTIFIER '=' pragma_value
 	;
 
 pragma_value
@@ -87,7 +87,7 @@ statement
 	;
 
 parallel_assignment
-	:	lvalue_tuple_parenthesized '<<'^ NEWLINE* (rvalue_tuple_parenthesized | rvalue_tuple)
+	:	lvalue_tuple_parenthesized '<<' NEWLINE* (rvalue_tuple_parenthesized | rvalue_tuple)
 	;
 
 local_declaration_assignment
@@ -109,15 +109,15 @@ global_declaration_assignment
 	;
 
 throw_statement
-	:	'_throw'^ (SYMBOL|LABEL) ('_with' expression)? // XXX: TODO: 1st expression should be SYMBOL?
+	:	'_throw' (SYMBOL|LABEL) ('_with' expression)? // XXX: TODO: 1st expression should be SYMBOL?
 	;
 
 import_statement
-	:	'_import'^ expression (',' expression)*
+	:	'_import' expression (',' expression)*
 	;
 
 control_statement
-	:	('_continue' | '_leave')^ LABEL? ('_with' expression)*
+	:	('_continue' | '_leave') LABEL? ('_with' expression)*
 	;
 	
 loopbody_statement
@@ -134,46 +134,46 @@ expression
 	;
 
 assignment_expression
-	:	logical_orif_expression (('<<' | '^<<'|'+<<'|'-<<'|'/<<'|'*<<')^ NEWLINE* logical_orif_expression)*
+	:	logical_orif_expression (('<<' | '^<<'|'+<<'|'-<<'|'/<<'|'*<<') NEWLINE* logical_orif_expression)*
 	;
 
 logical_orif_expression
-	:	logical_xor_expression (('_or' | '_orif')^ NEWLINE* logical_xor_expression)*
+	:	logical_xor_expression (('_or' | '_orif') NEWLINE* logical_xor_expression)*
 	;
 
 logical_xor_expression
-	:	logical_andif_expression ('_xor'^ NEWLINE* logical_andif_expression)*
+	:	logical_andif_expression ('_xor' NEWLINE* logical_andif_expression)*
 	;
 
 logical_andif_expression
-	:	equality_expression (('_and' | '_andif')^ NEWLINE* equality_expression)*
+	:	equality_expression (('_and' | '_andif') NEWLINE* equality_expression)*
 	;
 
 equality_expression
-	:	relational_expression (('<>' | '=' |'_is' | '_isnt' | '~=')^ NEWLINE* relational_expression)*
+	:	relational_expression (('<>' | '=' |'_is' | '_isnt' | '~=') NEWLINE* relational_expression)*
 	;
 
 relational_expression
-	:	additive_expression (('_cf' | '<' | '<=' | '>' | '>=')^ NEWLINE* additive_expression)*
+	:	additive_expression (('_cf' | '<' | '<=' | '>' | '>=') NEWLINE* additive_expression)*
 	;
 
 additive_expression
-	:	multiplicative_expression (('+' | '-')^ NEWLINE* multiplicative_expression)*
+	:	multiplicative_expression (('+' | '-') NEWLINE* multiplicative_expression)*
 	;
 
 multiplicative_expression
-	:	exponential_expression (('*' | '/' | '_div' | '_mod')^ NEWLINE* exponential_expression)*
+	:	exponential_expression (('*' | '/' | '_div' | '_mod') NEWLINE* exponential_expression)*
 	;
 
 exponential_expression
-	:	unary_expression ('**'^ NEWLINE? unary_expression)*
+	:	unary_expression ('**' NEWLINE? unary_expression)*
 	;
 
 unary_expression
-	:	'~'^ unary_expression |
-		'_not'^ unary_expression |
-		'-'^ unary_expression |
-		'+'^ unary_expression |
+	:	'~' unary_expression |
+		'_not' unary_expression |
+		'-' unary_expression |
+		'+' unary_expression |
 		'_allresults' unary_expression |
 		postfix_expression
 	;
@@ -250,8 +250,8 @@ literal
 	;
 
 procedure_declaration
-//	:	'_iter'? '_proc'^ LABEL? '(' parameter? (',' parameter)* ')' NEWLINE*
-	:	'_iter'? '_proc'^ LABEL? '(' parameter_list? ')' NEWLINE*
+//	:	'_iter'? '_proc' LABEL? '(' parameter? (',' parameter)* ')' NEWLINE*
+	:	'_iter'? '_proc' LABEL? '(' parameter_list? ')' NEWLINE*
 			(handling NEWLINE*)*
 			(statement NEWLINE*)*
 		'_endproc'
@@ -272,7 +272,7 @@ handling
 	;
 
 protect_block
-	:	'_protect'^ ('_locking' expression)? NEWLINE*
+	:	'_protect' ('_locking' expression)? NEWLINE*
 			(statement NEWLINE*)*
 		'_protection' NEWLINE*
 			(statement NEWLINE*)*
@@ -288,7 +288,7 @@ try_block
 	;
 
 catch_block
-	:	'_catch'^ (LABEL | SYMBOL) NEWLINE*
+	:	'_catch' (LABEL | SYMBOL) NEWLINE*
 			(handling NEWLINE+)*
 			(statement NEWLINE+)*
 		'_endcatch'
@@ -301,7 +301,7 @@ lock_block
 	;
 
 if_statement
-	:	'_if'^ expression NEWLINE*
+	:	'_if' expression NEWLINE*
 		'_then' NEWLINE*
 			(statement NEWLINE*)*
 		if_statement_elif*
