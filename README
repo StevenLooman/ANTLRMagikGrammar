@@ -1,0 +1,3 @@
+This is an ANTLR grammar which parses Smallworld Magik code. It is not fully complaint to the Magik 'standard', but parses most of the code I could find.
+
+The grammar is released under a BSD license. Please, do send some feedback when you are using this grammar. The source and contact information can be found at https://github.com/StevenLooman/ANTLRMagikGrammar.
