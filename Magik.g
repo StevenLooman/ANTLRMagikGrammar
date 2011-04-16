@@ -71,14 +71,6 @@ tokens {
 	WITH;
 }
 
-@lexer::header {
-//	package com.realworld.sonar.magik.antlr;
-}
-
-@header {
-//	package com.realworld.sonar.magik.antlr;
-}
-
 magik
 	:	(package_specification |
 		 pragma |

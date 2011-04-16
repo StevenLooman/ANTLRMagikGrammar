@@ -5,10 +5,6 @@ options {
 	ASTLabelType = CommonTree;
 }
 
-@header {
-//	package com.realworld.sonar.magik.antlr;
-}
-
 @members {
 	public void p(String str) {
 		System.out.println(str);
