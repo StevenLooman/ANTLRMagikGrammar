@@ -5,10 +5,6 @@ options {
 	ASTLabelType = CommonTree;
 }
 
-@header {
-	package com.realworld.sonar.magik.antlr;
-}
-
 @members {
 	public void p(String str) {
 		//System.out.println(str);
@@ -134,24 +130,6 @@ indexed_method_call
 parallel_assignment
 	:	^(PARALLEL_ASSIGNMENT lvalue* rvalue*)
 	;
-
-/*
-local_declaration_assignment
-	:	^(LOCAL_VARIABLE_DECLARATION ^(VARIABLE_DECLARATION lvalue*) ^(ARGUMENTS rvalue* expression?)) 
-	;
-
-constant_declaration_assignment
-	:	^(CONSTANT_VARIABLE_DECLARATION ^(VARIABLE_DECLARATION lvalue*) ^(ARGUMENTS rvalue* expression?)) 
-	;
-
-dynamic_declaration_assignment
-	:	^(DYNAMIC_VARIABLE_DECLARATION ^(VARIABLE_DECLARATION lvalue*) ^(ARGUMENTS rvalue* expression?)) 
-	;
-
-global_declaration_assignment
-	:	^(GLOBAL_VARIABLE_DECLARATION ^(VARIABLE_DECLARATION lvalue*) ^(ARGUMENTS rvalue* expression?)) 
-	;
-*/
 
 variable_declaration
 	:	^(VARIABLE_DECLARATION '_local'? '_dynamic'? '_global'? '_constant'? ^(DECLARATION lvalue+ arguments))

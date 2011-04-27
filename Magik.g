@@ -14,29 +14,26 @@ tokens {
 	CHEVRON;
 	CLONE;
 	CONTINUE;
-	DYNAMIC_VARIABLE_DECLARATION;
+	DECLARATION;
 	ELIF;
 	ELSE;
 	FALSE;
 	FINALLY;
 	FOR;
-	GLOBAL_VARIABLE_DECLARATION;
 	HANDLING;
 	IF;
 	IMPORT;
-	INDEXED_METHOD_CALL;
-	INDEXED_METHOD_CALL;
 	INDEXED_METHOD_DECLARATION;
+	INDEXED_METHOD_INVOCATION;
 	LEAVE;
-	LOCAL_VARIABLE_DECLARATION;
 	LOCK;
 	LOCKING;
 	LOOP;
 	LOOPBODY;
 	LVALUE;
 	MAYBE;
-	METHOD_CALL;
 	METHOD_DECLARATION;
+	METHOD_INVOCATION;
 	METHOD_MESSAGE_CALL;
 	METHOD_MESSAGE_INDEXER;
 	METHOD_MODIFIERS;
@@ -45,13 +42,14 @@ tokens {
 	PARALLEL_ASSIGNMENT;
 	PARAMETER_MODIFIERS;
 	PARAMETER;
-	PARAMETERS;
 	PRAGMA_VALUE;
 	PRAGMA;
+	PRIMITIVE;
 	PROCEDURE_CALL;
 	PROCEDURE_DECLARATION;
 	PROTECT;
 	PROTECTION;
+	RESULT;
 	RETURN;
 	RVALUE;
 	SELF;
@@ -71,13 +69,33 @@ tokens {
 	WITH;
 }
 
+@lexer::header {
+	package com.realworld.sonar.magik.antlr;
+}
+
+@header {
+	package com.realworld.sonar.magik.antlr;
+}
+
+@parser::members {
+	private void enableNewline() {
+		//CommonTokenStream stream = (CommonTokenStream)input;
+		//stream.setTokenTypeChannel(NEWLINE, DEFAULT_TOKEN_CHANNEL);
+	}
+	
+	private void disableNewline() {
+		//CommonTokenStream stream = (CommonTokenStream)input;
+		//stream.setTokenTypeChannel(NEWLINE, HIDDEN);
+	}
+}
+
 magik
 	:	(package_specification |
 		 pragma |
 		 method_declaration |
 		 statement |
 		 transmit |
-		 (NEWLINE!)+)+
+		 NEWLINE!)+
 	;
 	
 transmit
@@ -115,13 +133,12 @@ method_declaration
 //		 method_modifiers '_method' IDENTIFIER '.' IDENTIFIER)
 //	:	method_modifiers '_method' IDENTIFIER (('.' IDENTIFIER ('(' parameter_list? ')')?) | ('[' parameter_list ']')) (('<<'|'^<<') IDENTIFIER)? NEWLINE+
 	:	method_modifiers '_method' IDENTIFIER (method_declaration_dot | method_declaration_lsquare) method_declaration_assignment? NEWLINE+
-			(handling NEWLINE+)*
-			(statement NEWLINE+)*
-		'_endmethod' -> ^(METHOD_DECLARATION method_modifiers IDENTIFIER method_declaration_dot? method_declaration_lsquare? method_declaration_assignment? ^(BODY handling* statement*))
+			body
+		'_endmethod' -> ^(METHOD_DECLARATION method_modifiers IDENTIFIER method_declaration_dot? method_declaration_lsquare? method_declaration_assignment? body)
 	;
 	
 method_declaration_dot
-	:	'.' IDENTIFIER ('(' parameter_list? ')')? -> ^(METHOD_MESSAGE_CALL IDENTIFIER parameter_list?)
+	:	'.' IDENTIFIER ('(' parameter_list? NEWLINE* ')')? -> ^(METHOD_MESSAGE_CALL IDENTIFIER '('? parameter_list?)
 	;
 	
 method_declaration_lsquare
@@ -140,30 +157,35 @@ method_modifiers
 	;
 
 parameter_list
-	:	parameter (',' NEWLINE* parameter)* -> parameter+
+	:	parameter (','? NEWLINE* parameter)* -> parameter+
 	;
 
 parameter
-	:	parameter_modifiers NEWLINE? IDENTIFIER -> ^(PARAMETER parameter_modifiers IDENTIFIER)
+	:	parameter_modifiers NEWLINE* IDENTIFIER -> ^(PARAMETER parameter_modifiers IDENTIFIER) // (param_mods | newline)*
 	;
 
 parameter_modifiers
 	:	('_optional' |
 		 '_gather')* -> ^(PARAMETER_MODIFIERS '_optional'* '_gather'*)
 	;
+	
+body
+	:	(handling NEWLINE*)*
+		(statement NEWLINE*)*
+		-> ^(BODY handling* statement*)
+	;
 
 statement
 	:	(parallel_assignment |
-		 local_declaration_assignment |
-		 dynamic_declaration_assignment |
-		 global_declaration_assignment |
+		 variable_declaration |
 		 throw_statement |
-		 import_statement |
 		 continue_statement |
 		 leave_statement |
 		 loopbody_statement |
-		 return_statement |
+		 primitive_statement |
 		 expression |
+		 result_statement |
+	 	 return_statement |
 		 ';'!)
 	;
 
@@ -173,48 +195,48 @@ parallel_assignment
 	//  this might fix the ambiguity of the grammar
 	:	lvalues_parenthesized '<<' NEWLINE* (rvalues_parenthesized | rvalues) -> ^(PARALLEL_ASSIGNMENT lvalues_parenthesized rvalues_parenthesized? rvalues?)
 	;
-
-local_declaration_assignment
-//	:	'_local' '_constant'?  lvalue_tuple
-//		'_local' '_constant'?  lvalue_tuple '<<' expression
-//		'_local' '_constant'? '(' lvalue_tuple ')'
-//		'_local' '_constant'? '(' lvalue_tuple ')' '<<' expression |
-//		'_local' '_constant'? '(' lvalue_tuple ')' '<<' '(' rvalue_tuple ')' |
-//		'_local' '_constsant'? (variable '<<' expression)+ // XXX: TODO
-	:	'_local' '_constant'? (lvalues_parenthesized | lvalues) ('<<' NEWLINE* (rvalues_parenthesized | expression))? -> ^(LOCAL_VARIABLE_DECLARATION ^(VARIABLE_DECLARATION lvalues_parenthesized? lvalues?) ^(ARGUMENTS rvalues_parenthesized? expression?)) 
+	
+variable_declaration
+	// constant local constant parallel_assignemnt | sequential_assignment
+	:	('_recursive' | '_constant' | '_local' | '_dynamic' | '_global' | '_import')+ (variable_declaration_sequential_assignment | variable_declaration_parallel_assignment)?
+			-> ^(VARIABLE_DECLARATION '_recursive'? '_constant'? '_local'? '_dynamic'? '_global'? '_import'?
+				variable_declaration_sequential_assignment? variable_declaration_parallel_assignment?)
 	;
 
-dynamic_declaration_assignment
-	:	'_dynamic' (lvalues_parenthesized | lvalues) ('<<' NEWLINE* (rvalues_parenthesized | expression))? -> ^(DYNAMIC_VARIABLE_DECLARATION ^(VARIABLE_DECLARATION lvalues_parenthesized? lvalues?) ^(ARGUMENTS rvalues_parenthesized? expression?)) 
+variable_declaration_parallel_assignment
+	:	lvalues_parenthesized '<<' NEWLINE* (rvalues_parenthesized | rvalues) -> ^(DECLARATION lvalues_parenthesized ^(ARGUMENTS rvalues_parenthesized? rvalues?))
 	;
 
-global_declaration_assignment
-	:	'_global' '_constant'? (lvalues_parenthesized | lvalues) ('<<' NEWLINE* (rvalues_parenthesized | expression))? -> ^(GLOBAL_VARIABLE_DECLARATION ^(VARIABLE_DECLARATION lvalues_parenthesized? lvalues?) ^(ARGUMENTS rvalues_parenthesized? expression?)) 
+variable_declaration_sequential_assignment
+	:	lvalue ('<<' NEWLINE* rvalue)? NEWLINE* (',' NEWLINE* lvalue ('<<' NEWLINE* rvalue)?)* -> ^(DECLARATION lvalue+ ^(ARGUMENTS rvalue*))
 	;
 
 throw_statement
-	:	'_throw' (SYMBOL|LABEL) with? -> ^(THROW SYMBOL? LABEL? with)// XXX: TODO: 1st expression should be SYMBOL?
-	;
-
-import_statement
-	:	'_import' expression (',' expression)* -> ^(IMPORT expression+)
+	:	'_throw' (SYMBOL|LABEL) with? -> ^(THROW SYMBOL? LABEL? with?)
 	;
 
 continue_statement
-	:	'_continue' LABEL? with -> ^(CONTINUE LABEL? with)
+	:	'_continue' LABEL? with? -> ^(CONTINUE LABEL? with?)
 	;
 
 leave_statement
-	:	'_leave' LABEL? with ->  ^(LEAVE LABEL? with)
+	:	'_leave' LABEL? with? ->  ^(LEAVE LABEL? with?)
 	;
 	
 loopbody_statement
 	:	'_loopbody' rvalues_parenthesized -> ^(LOOPBODY rvalues_parenthesized)
 	;
 
+primitive_statement
+	:	'_primitive' NUMBER -> ^(PRIMITIVE NUMBER)
+	;
+
 return_statement
-	:	'_return' (rvalues_parenthesized | rvalues)? -> ^(RETURN rvalues_parenthesized? rvalues?) |
-		'>>' NEWLINE* (rvalues_parenthesized | rvalues) -> ^(RETURN rvalues_parenthesized? rvalues?)
+	:	'_return' (rvalues_parenthesized | rvalues)? -> ^(RETURN rvalues_parenthesized? rvalues?)
+	;
+
+result_statement
+	:	'>>' NEWLINE* (rvalues_parenthesized | rvalues) -> ^(RESULT rvalues_parenthesized? rvalues?)
 	;
 
 expression
@@ -222,94 +244,89 @@ expression
 	;
 
 assignment_expression
-	:	logical_orif_expression (('<<' | '^<<' | '+<<' | '-<<' | '/<<' | '*<<')^ NEWLINE* logical_orif_expression)*
+	:	logical_orif_expression (('<<' | '^<<' | '+<<' | '-<<' | '/<<' | '*<<'| '+^<<' | '-^<<' | '/^<<' | '*^<<')^ (NEWLINE!)* logical_orif_expression)*
 	;
 
 logical_orif_expression
-	:	logical_xor_expression (('_or' | '_orif')^ NEWLINE* logical_xor_expression)*
+	:	logical_xor_expression (('_or' | '_orif')^ (NEWLINE!)* logical_xor_expression)*
 	;
 
 logical_xor_expression
-	:	logical_andif_expression ('_xor'^ NEWLINE* logical_andif_expression)*
+	:	logical_andif_expression ('_xor'^ (NEWLINE!)* logical_andif_expression)*
 	;
 
 logical_andif_expression
-	:	equality_expression (('_and' | '_andif')^ NEWLINE* equality_expression)*
+	:	equality_expression (('_and' | '_andif')^ (NEWLINE!)* equality_expression)*
 	;
 
 equality_expression
-	:	relational_expression (('<>' | '=' |'_is' | '_isnt' | '~=')^ NEWLINE* relational_expression)*
+	:	relational_expression (('<>' | '=' |'_is' | '_isnt' | '~=')^ (NEWLINE!)* relational_expression)*
 	;
 
 relational_expression
-	:	additive_expression (('_cf' | '<' | '<=' | '>' | '>=')^ NEWLINE* additive_expression)*
+	:	additive_expression (('_cf' | '<' | '<=' | '>' | '>=')^ (NEWLINE!)* additive_expression)*
 	;
 
 additive_expression
-	:	multiplicative_expression (('+' | '-')^ NEWLINE* multiplicative_expression)*
+	:	multiplicative_expression (('+' | '-')^ (NEWLINE!)* multiplicative_expression)*
 	;
 
 multiplicative_expression
-	:	exponential_expression (('*' | '/' | '_div' | '_mod')^ NEWLINE* exponential_expression)*
+	:	exponential_expression (('*' | '/' | '_div' | '_mod')^ (NEWLINE!)* exponential_expression)*
 	;
 
 exponential_expression
-	:	unary_expression ('**'^ NEWLINE? unary_expression)*
+	:	unary_expression ('**'^ (NEWLINE!)* unary_expression)*
 	;
 
 unary_expression
-	:	'~' unary_expression -> ^('~' unary_expression) |
-		'_not' unary_expression -> ^('_not' unary_expression) |
-		'-' unary_expression -> ^(SIGN_MINUS unary_expression) |
-		'+' unary_expression -> ^(SIGN_PLUS unary_expression) |
-		'_allresults' unary_expression -> ^('_allresults' unary_expression) |
+	:	'~' NEWLINE* unary_expression -> ^('~' unary_expression) |
+		'_not' NEWLINE* unary_expression -> ^('_not' unary_expression) |
+		'-' NEWLINE* unary_expression -> ^(SIGN_MINUS unary_expression) |
+		'+' NEWLINE* unary_expression -> ^(SIGN_PLUS unary_expression) |
+		'_allresults' NEWLINE* unary_expression -> ^('_allresults' unary_expression) |
+		'_scatter' NEWLINE* unary_expression -> ^('_scatter' unary_expression) |
 		postfix_expression
 	;
 
 postfix_expression
-	:	//literal { test: }({ if (isNewLine()) { break test; } } procedure_call? { System.out.println("procedure call"); })
-		//literal (~NEWLINE) => (procedure_call? | (method_call | indexed_method_call)*) //(procedure_call? | method_call*)
-//		literal (method_call | indexed_method_call)* //(procedure_call? | method_call*)
-//		literal procedure_call?
-		atom 
+	:	atom { enableNewline(); }
 			(
-				('(') => procedure_call?
-			)
-			(
-				('.') => method_call |
-				('[') => indexed_method_call
-			)*
+				('(') => procedure_call |
+				('.') => method_invocation |
+				('[') => indexed_method_invocation
+			)* { disableNewline(); }
 	;
 
 procedure_call
-	:	(~NEWLINE) => '(' NEWLINE* rvalues? NEWLINE* ')' -> ^(PROCEDURE_CALL ^(ARGUMENTS rvalues))
+	:	'(' NEWLINE* rvalues? NEWLINE* ')' -> ^(PROCEDURE_CALL ^(ARGUMENTS rvalues?))
 	;
 
-method_call
+method_invocation // XXX: TODO: field access method invocation
 //	:	'.' IDENTIFIER '(' expression? (',' expression)* ')'  '<<' expression |
 //		'.' IDENTIFIER '(' expression? (',' expression)* ')' '^<<' expression |
-//		'.' IDENTIFIER                                        '<<' expression |
-//		'.' IDENTIFIER                                       '^<<' expression |
-//		'.' IDENTIFIER '(' expression? (',' expression)* ')' |
-//		'.' IDENTIFIER
-	:	(~NEWLINE) => '.' NEWLINE* IDENTIFIER ('(' NEWLINE* rvalues? NEWLINE* ')')?  method_assignment? -> ^(METHOD_CALL IDENTIFIER ^(ARGUMENTS rvalues?) method_assignment?)
+//		'.' IDENTIFIER '(' expression? (',' expression)* ')'                  |
+//		'.' IDENTIFIER                                        '<<' expression | // field method invocation
+//		'.' IDENTIFIER                                       '^<<' expression | // field method invocation
+//		'.' IDENTIFIER                                                          // field method invocation
+	:	'.' NEWLINE* IDENTIFIER ('(' NEWLINE* rvalues? NEWLINE* ')')?  method_assignment? -> ^(METHOD_INVOCATION IDENTIFIER ^(ARGUMENTS rvalues?) method_assignment?)
 	;
 
 method_assignment
-	:	'<<' IDENTIFIER -> ^(CHEVRON IDENTIFIER) |
-		'^<<' IDENTIFIER -> ^(BOOT_CHEVRON IDENTIFIER)
+	:	'<<' NEWLINE* expression -> ^(CHEVRON expression) |
+		'^<<' NEWLINE* expression -> ^(BOOT_CHEVRON expression)
 	;
 	
-indexed_method_call
+indexed_method_invocation
 //	:	'[' expression (',' expression)* ']'                  '<<' expression |
 //		'[' expression (',' expression)* ']'                 '^<<' expression |
 //		'[' expression (',' expression)* ']'
-	:	(~NEWLINE) => '[' NEWLINE* rvalues NEWLINE* ']' method_assignment? -> ^(INDEXED_METHOD_CALL ^(ARGUMENTS rvalues) method_assignment?)
+	:	'[' NEWLINE* rvalues NEWLINE* ']' method_assignment? -> ^(INDEXED_METHOD_INVOCATION ^(ARGUMENTS rvalues) method_assignment?)
 	;
 
 atom
 	:	'(' expression ')' -> expression |
-		'_self'  -> SELF |
+		'_self'  -> SELF  |
 		'_clone' -> CLONE |
 		'_super' -> SUPER | //('(' IDENTIFIER ')')? | // XXX _super(exemplar) is legal, but we solve this in a later stage
 		'_unset' -> UNSET |
@@ -330,8 +347,7 @@ atom
 		over_loop |
 		loop |
 		slot |
-		INTEGER |
-		FLOAT |
+		NUMBER |
 		CHARACTER_SEQUENCE |
 		CHARACTER |
 		SYMBOL |
@@ -344,30 +360,28 @@ atom
 procedure_declaration
 //	:	'_iter'? '_proc'^ LABEL? '(' parameter? (',' parameter)* ')' NEWLINE*
 	:	'_iter'? '_proc' LABEL? '(' parameter_list? ')' NEWLINE*
-			(handling NEWLINE*)*
-			(statement NEWLINE*)*
-		'_endproc' -> ^(PROCEDURE_DECLARATION '_iter'? ^(PARAMETERS parameter_list?) ^(BODY handling* statement*))
+			body
+		'_endproc' -> ^(PROCEDURE_DECLARATION '_iter'? LABEL? parameter_list? body)
 	;
 	
 block
 	:	'_block' LABEL? NEWLINE*
-			(handling NEWLINE*)*
-			(statement NEWLINE*)*
-		'_endblock' -> ^(BLOCK LABEL? ^(BODY handling* statement*))
+			body
+		'_endblock' -> ^(BLOCK LABEL? body)
 	;
 
 handling
 //	:	'_handling' IDENTIFIER (',' IDENTIFIER)* '_with' expression |
 //		'_handling' IDENTIFIER (',' IDENTIFIER)* '_with' '_default' |
 //		'_handling' '_default'
-	:	'_handling' (IDENTIFIER (',' IDENTIFIER)* with_default) -> ^(HANDLING IDENTIFIER+ with_default)
+	:	'_handling' (IDENTIFIER (',' IDENTIFIER)* NEWLINE* with_default) -> ^(HANDLING IDENTIFIER+ with_default)
 	;
 
 protect_block
 	:	'_protect' locking? NEWLINE*
-			(statement NEWLINE*)*
+			body
 		protection
-		'_endprotect' -> ^(PROTECT locking? ^(BODY statement*) protection)
+		'_endprotect' -> ^(PROTECT locking? body protection)
 	;
 
 locking
@@ -381,55 +395,54 @@ protection
 
 try_block
 	:	'_try' NEWLINE* with? NEWLINE*
-			(statement NEWLINE+)*
+			body
 		when+
-		'_endtry' -> ^(TRY with ^(BODY statement*) when+)
+		'_endtry' -> ^(TRY with? body when+)
 	;
 	
 with
-	:	'_with' NEWLINE* expression -> ^(WITH expression)
+	:	'_with' NEWLINE* '('? expression (',' NEWLINE* expression)* ')'? -> ^(WITH expression+)
 	;
 	
 with_default
-	:	'_with' NEWLINE* (expression | '_default') -> ^(WITH expression? '_default')
+	:	'_with' NEWLINE* (expression | '_default') -> ^(WITH expression? '_default'?)
 	;
 	
 when
-	:	'_when' IDENTIFIER (',' NEWLINE* IDENTIFIER)* NEWLINE*
-			(statement NEWLINE+)* -> ^(WHEN IDENTIFIER+ ^(BODY statement*))
+	:	'_when' NEWLINE* IDENTIFIER (',' NEWLINE* IDENTIFIER)* NEWLINE*
+			body -> ^(WHEN IDENTIFIER+ body)
 	;
 
 catch_block
-	:	'_catch' (LABEL | SYMBOL) NEWLINE*
-			(handling NEWLINE+)*
-			(statement NEWLINE+)*
-		'_endcatch' -> ^(CATCH LABEL? SYMBOL? ^(BODY handling* statement*))
+	:	'_catch' (expression | LABEL) NEWLINE*
+			body
+		'_endcatch' -> ^(CATCH expression? LABEL? body)
 	;
 	
 lock_block
 	:	'_lock' expression NEWLINE*
-			(statement NEWLINE+)*
-		'_endlock' -> ^(LOCK expression ^(BODY statement*))
+			body
+		'_endlock' -> ^(LOCK expression body)
 	;
 
 if_statement
-	:	'_if' expression NEWLINE*
+	:	'_if' NEWLINE* expression NEWLINE*
 		'_then' NEWLINE*
-			(statement NEWLINE*)*
+			body
 		if_statement_elif*
 		if_statement_else?
-		'_endif' -> ^(IF expression ^(BODY statement*) if_statement_elif* if_statement_else*)
+		'_endif' -> ^(IF expression body if_statement_elif* if_statement_else?)
 	;
 
 if_statement_elif
-	:	'_elif' expression NEWLINE*
+	:	'_elif' NEWLINE* expression NEWLINE*
 		'_then' NEWLINE*
-			(statement NEWLINE*)* -> ^(ELIF expression ^(BODY statement*))
+			body -> ^(ELIF expression body)
 	;
 
 if_statement_else
 	:	'_else' NEWLINE*
-			(statement NEWLINE*)* -> ^(ELSE ^(BODY statement*))
+			body -> ^(ELSE body)
 
 	;
 
@@ -444,15 +457,14 @@ over_loop
 
 loop
 	:	'_loop' LABEL? NEWLINE*
-			(handling NEWLINE+)*
-			(statement NEWLINE+)*
+			body
 		finally_block?
-		'_endloop' -> ^(LOOP LABEL? ^(BODY handling* statement*) finally_block?)
+		'_endloop' -> ^(LOOP LABEL? body finally_block?)
 	;
 
 finally_block
 	:	'_finally' NEWLINE*
-			(statement NEWLINE+)* -> ^(FINALLY ^(BODY statement*))
+			body -> ^(FINALLY body)
 	;
 
 simple_vector
@@ -487,7 +499,7 @@ rvalue
 	;
 
 rvalues_parenthesized
-	:	'('! rvalues ')'!
+	:	'(' rvalues ')' -> rvalues
 	;
 
 IDENTIFIER
@@ -501,7 +513,7 @@ PACKAGED_IDENTIFIER
 SYMBOL
 	:	':' (
 			('0'..'9'|'a'..'z'|'A'..'Z'|'_'|'!'|'?') |
-			('|' ('0'..'9'|'a'..'z'|'A'..'Z'|' '|'('|')'|'{'|'}'|'['|']'|';'|':'|'*'|'/'|'_'|'-'|'\\'|'?'|'"'|'<'|'>'|'!')* '|')
+			('|' (~'|')* '|')
 		)+
 	;
 
@@ -513,14 +525,19 @@ LABELED_GLOBAL_VARIABLE
 	:	LABEL ':' IDENTIFIER
 	;
 	
-INTEGER
-	:	('0'..'9')+ // XXX: TODO: Radix and exponent
+NUMBER
+	:	(('0'..'9')+ '.' ('0'..'9')+) => FLOAT |
+		(('0'..'9')+ '.' ~('0'..'9')) => INTEGER
 	;
-
+	
+fragment
+INTEGER // XXX: TODO: Radix
+	:	('0'..'9')+ EXPONENT?
+	;
+	
+fragment
 FLOAT  // XXX: TODO: Radix
-	:	('0'..'9')+ '.' ('0'..'9')* EXPONENT? // XXX: TODO: "9.method_name" is _NOT_ a float, but a method invocation on an integer
-	|	'.' ('0'..'9')+ EXPONENT?
-	|	('0'..'9')+ EXPONENT
+	:	('0'..'9')+ '.' ('0'..'9')+ EXPONENT?
 	;
 
 ENCODING_COMMENT
@@ -536,7 +553,7 @@ COMMENT
 	;
 
 CHARACTER_SEQUENCE
-	:	'"' ( ESC_SEQ | ~('"') )* '"'
+	:	'"' (~'"')* '"'
 	;
 
 CHARACTER
@@ -555,29 +572,10 @@ HEX_DIGIT
 	:	('0'..'9'|'a'..'f'|'A'..'F')
 	;
 
-fragment
-ESC_SEQ
-	:	'\\' ('b'|'t'|'n'|'f'|'r'|'\"'|'\''|'\\')
-	|	UNICODE_ESC
-	|	OCTAL_ESC
-	;
-    
-fragment
-OCTAL_ESC
-	:	'\\' ('0'..'3') ('0'..'7') ('0'..'7')
-	|	'\\' ('0'..'7') ('0'..'7')
-	|	'\\' ('0'..'7')
- 	;
-
-fragment
-UNICODE_ESC
-	:	'\\' 'u' HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT
-	;
-
 WS
 	:	(' ' | '\t') { skip(); }
 	;
 
 NEWLINE
-	:	('\r'? '\n') //{ $channel = HIDDEN; }
+	:	('\r'? '\n')
 	;
